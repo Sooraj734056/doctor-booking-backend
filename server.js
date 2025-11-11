@@ -12,20 +12,54 @@ connectDB();
 
 const app = express();
 const server = http.createServer(app);
+
+// Allowed origins: localhost for dev + FRONTEND_URL from env (set this on Render when frontend is deployed)
+const allowedOrigins = [
+  'http://localhost:3000',
+  'http://localhost:3001', // if you use another local port
+];
+
+// If FRONTEND_URL is provided in env, add it
+if (process.env.FRONTEND_URL) {
+  allowedOrigins.push(process.env.FRONTEND_URL);
+}
+
 const io = socketIo(server, {
   cors: {
-    origin: ["http://localhost:3000", "http://localhost:3001"],
-    methods: ["GET", "POST"]
-  }
+    origin: allowedOrigins,
+    methods: ['GET', 'POST', 'PUT', 'DELETE'],
+    credentials: true,
+  },
 });
 
-app.use(cors());
+// Configure CORS for Express
+app.use(
+  cors({
+    origin: function (origin, callback) {
+      // allow requests with no origin (like mobile apps or curl)
+      if (!origin) return callback(null, true);
+      if (allowedOrigins.indexOf(origin) === -1) {
+        const msg = 'The CORS policy for this site does not allow access from the specified Origin.';
+        return callback(new Error(msg), false);
+      }
+      return callback(null, true);
+    },
+    methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+    allowedHeaders: ['Content-Type', 'Authorization', 'Accept'],
+    credentials: true,
+    maxAge: 86400,
+  })
+);
+
+// Handle preflight OPTIONS requests for all routes (safe)
+app.options('*', cors());
+
 app.use(express.json());
 
+// Routes
 app.use('/api/doctors', doctorRoutes);
 app.use('/api/appointments', appointmentRoutes);
 
-// Routes
 const authRoutes = require('./routes/authRoutes');
 const messageRoutes = require('./routes/messageRoutes');
 const userRoutes = require('./routes/userRoutes');
@@ -33,7 +67,7 @@ app.use('/api/auth', authRoutes);
 app.use('/api/messages', messageRoutes);
 app.use('/api/users', userRoutes);
 
-// Make io available in routes
+// Make io available to routes if needed
 app.set('io', io);
 
 app.get('/', (req, res) => {
@@ -44,15 +78,12 @@ app.get('/', (req, res) => {
 io.on('connection', (socket) => {
   console.log('User connected:', socket.id);
 
-  // Join user room
   socket.on('join', (userId) => {
     socket.join(userId);
     console.log(`User ${userId} joined room`);
   });
 
-  // Handle new message
   socket.on('send_message', (data) => {
-    // Emit to recipient
     io.to(data.to).emit('receive_message', data);
   });
 
