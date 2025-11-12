@@ -16,10 +16,10 @@ const server = http.createServer(app);
 // Allowed origins: localhost for dev + FRONTEND_URL from env (set this on Render when frontend is deployed)
 const allowedOrigins = [
   'http://localhost:3000',
-  'http://localhost:3001', // if you use another local port
+  'http://localhost:3001', // optional dev port
 ];
 
-// If FRONTEND_URL is provided in env, add it
+// Add frontend URL from env
 if (process.env.FRONTEND_URL) {
   allowedOrigins.push(process.env.FRONTEND_URL);
 }
@@ -51,7 +51,7 @@ app.use(
   })
 );
 
-// Handle preflight OPTIONS requests for all routes (safe)
+// Handle preflight OPTIONS requests
 app.options('*', cors());
 
 app.use(express.json());
@@ -63,6 +63,7 @@ app.use('/api/appointments', appointmentRoutes);
 const authRoutes = require('./routes/authRoutes');
 const messageRoutes = require('./routes/messageRoutes');
 const userRoutes = require('./routes/userRoutes');
+
 app.use('/api/auth', authRoutes);
 app.use('/api/messages', messageRoutes);
 app.use('/api/users', userRoutes);
