@@ -13,17 +13,19 @@ connectDB();
 const app = express();
 const server = http.createServer(app);
 
-// Allowed origins: localhost for dev + FRONTEND_URL from env (set this on Render when frontend is deployed)
+// ✅ Allowed origins (Render frontend + localhost)
 const allowedOrigins = [
   'http://localhost:3000',
-  'http://localhost:3001', // optional dev port
+  'http://localhost:3001',
+  'https://doctor-booking-frontend-2.onrender.com', // ✅ add this
 ];
 
-// Add frontend URL from env
-if (process.env.FRONTEND_URL) {
+// ✅ Also allow FRONTEND_URL from .env (optional)
+if (process.env.FRONTEND_URL && !allowedOrigins.includes(process.env.FRONTEND_URL)) {
   allowedOrigins.push(process.env.FRONTEND_URL);
 }
 
+// ✅ Socket.io setup with CORS
 const io = socketIo(server, {
   cors: {
     origin: allowedOrigins,
@@ -32,14 +34,13 @@ const io = socketIo(server, {
   },
 });
 
-// Configure CORS for Express
+// ✅ Express CORS setup
 app.use(
   cors({
     origin: function (origin, callback) {
-      // allow requests with no origin (like mobile apps or curl)
       if (!origin) return callback(null, true);
       if (allowedOrigins.indexOf(origin) === -1) {
-        const msg = 'The CORS policy for this site does not allow access from the specified Origin.';
+        const msg = 'CORS policy does not allow this origin.';
         return callback(new Error(msg), false);
       }
       return callback(null, true);
@@ -51,12 +52,12 @@ app.use(
   })
 );
 
-// Handle preflight OPTIONS requests
+// ✅ Preflight request handle
 app.options('*', cors());
 
 app.use(express.json());
 
-// Routes
+// ✅ Routes
 app.use('/api/doctors', doctorRoutes);
 app.use('/api/appointments', appointmentRoutes);
 
@@ -68,14 +69,14 @@ app.use('/api/auth', authRoutes);
 app.use('/api/messages', messageRoutes);
 app.use('/api/users', userRoutes);
 
-// Make io available to routes if needed
+// ✅ Make io available to routes
 app.set('io', io);
 
 app.get('/', (req, res) => {
   res.send('Healthcare API running...');
 });
 
-// Socket.IO connection
+// ✅ Socket.IO connection
 io.on('connection', (socket) => {
   console.log('User connected:', socket.id);
 
