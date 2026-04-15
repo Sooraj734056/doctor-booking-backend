@@ -13,47 +13,63 @@ connectDB();
 const app = express();
 const server = http.createServer(app);
 
-// ✅ Allowed origins (Render frontend + localhost)
-const allowedOrigins = [
-  'http://localhost:3000',
-  'http://localhost:3001',
-  'https://doctor-booking-frontend-2.onrender.com', // ✅ add this
-];
+const normalizeOrigin = (value) => {
+  if (!value) return null;
 
-// ✅ Also allow FRONTEND_URL from .env (optional)
-if (process.env.FRONTEND_URL && !allowedOrigins.includes(process.env.FRONTEND_URL)) {
-  allowedOrigins.push(process.env.FRONTEND_URL);
-}
+  const trimmed = String(value).trim();
+  if (!trimmed) return null;
+
+  try {
+    const parsed = new URL(trimmed);
+    return `${parsed.protocol}//${parsed.host}`.toLowerCase();
+  } catch {
+    return trimmed.replace(/\/+$/, '').toLowerCase();
+  }
+};
+
+const allowedOrigins = new Set(
+  [
+    'http://localhost:3000',
+    'http://localhost:3001',
+    'https://doctor-booking-frontend-2.onrender.com',
+    process.env.FRONTEND_URL,
+  ]
+    .flatMap((entry) => (entry ? String(entry).split(',') : []))
+    .map(normalizeOrigin)
+    .filter(Boolean)
+);
+
+const corsOptions = {
+  origin: function (origin, callback) {
+    if (!origin) return callback(null, true);
+
+    const normalizedOrigin = normalizeOrigin(origin);
+    if (allowedOrigins.has(normalizedOrigin)) {
+      return callback(null, true);
+    }
+
+    return callback(new Error('CORS policy does not allow this origin.'), false);
+  },
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'Accept'],
+  credentials: true,
+  maxAge: 86400,
+};
 
 // ✅ Socket.io setup with CORS
 const io = socketIo(server, {
   cors: {
-    origin: allowedOrigins,
+    origin: Array.from(allowedOrigins),
     methods: ['GET', 'POST', 'PUT', 'DELETE'],
     credentials: true,
   },
 });
 
 // ✅ Express CORS setup
-app.use(
-  cors({
-    origin: function (origin, callback) {
-      if (!origin) return callback(null, true);
-      if (allowedOrigins.indexOf(origin) === -1) {
-        const msg = 'CORS policy does not allow this origin.';
-        return callback(new Error(msg), false);
-      }
-      return callback(null, true);
-    },
-    methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-    allowedHeaders: ['Content-Type', 'Authorization', 'Accept'],
-    credentials: true,
-    maxAge: 86400,
-  })
-);
+app.use(cors(corsOptions));
 
 // ✅ Preflight request handle
-app.options('*', cors());
+app.options('*', cors(corsOptions));
 
 app.use(express.json());
 
