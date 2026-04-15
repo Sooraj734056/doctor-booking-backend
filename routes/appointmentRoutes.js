@@ -24,18 +24,23 @@ router.post('/', protect, async (req, res) => {
       notes
     });
 
-    // Get user and doctor details for email
-    const user = await User.findById(req.user._id);
-    const doctorDetails = await Appointment.findById(appointment._id).populate('doctor', 'name');
+    // Try to send confirmation email (non-blocking — don't fail the request if email fails)
+    try {
+      const user = await User.findById(req.user._id);
+      const doctorDetails = await Appointment.findById(appointment._id).populate('doctor', 'name');
 
-    // Send confirmation email
-    await sendAppointmentConfirmation(
-      user.email,
-      user.name,
-      doctorDetails.doctor.name,
-      date,
-      time
-    );
+      if (user && doctorDetails && doctorDetails.doctor) {
+        await sendAppointmentConfirmation(
+          user.email,
+          user.name,
+          doctorDetails.doctor.name,
+          date,
+          time
+        );
+      }
+    } catch (emailErr) {
+      console.error('Email sending failed (non-critical):', emailErr.message);
+    }
 
     res.status(201).json(appointment);
   } catch (err) {

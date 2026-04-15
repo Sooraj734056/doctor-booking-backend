@@ -64,10 +64,17 @@ app.use('/api/appointments', appointmentRoutes);
 const authRoutes = require('./routes/authRoutes');
 const messageRoutes = require('./routes/messageRoutes');
 const userRoutes = require('./routes/userRoutes');
+const aiRoutes = require('./routes/aiRoutes');
+const adminRoutes = require('./routes/adminRoutes');
 
 app.use('/api/auth', authRoutes);
 app.use('/api/messages', messageRoutes);
 app.use('/api/users', userRoutes);
+app.use('/api/ai', aiRoutes);
+app.use('/api/admin', adminRoutes);
+const { notFound, errorHandler } = require('./middleware/errorMiddleware');
+app.use(notFound);
+app.use(errorHandler);
 
 // ✅ Make io available to routes
 app.set('io', io);
@@ -94,5 +101,24 @@ io.on('connection', (socket) => {
   });
 });
 
-const PORT = process.env.PORT || 5000;
-server.listen(PORT, () => console.log(`🚀 Server running on port ${PORT}`));
+let currentPort = Number(process.env.PORT) || 5000;
+
+server.on('error', (error) => {
+  if (error.code === 'EADDRINUSE') {
+    const nextPort = currentPort + 1;
+    console.warn(`⚠️ Port ${currentPort} is busy. Retrying on port ${nextPort}...`);
+    currentPort = nextPort;
+    setTimeout(() => {
+      server.listen(currentPort);
+    }, 300);
+    return;
+  }
+
+  throw error;
+});
+
+server.on('listening', () => {
+  console.log(`🚀 Server running on port ${currentPort}`);
+});
+
+server.listen(currentPort);
